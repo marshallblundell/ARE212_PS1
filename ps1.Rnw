@@ -1,0 +1,569 @@
+% My knitr options
+<<echo=F>>=
+knitr::opts_chunk$set(fig.pos = 'h')
+@
+
+\documentclass[11pt]{article}
+\usepackage{amsmath, amssymb, amsthm, etoolbox, bm, enumitem}
+\usepackage{enumitem, multicol, tasks, mathrsfs, hyperref, mhchem}
+% stops Latex Font Warning: Font shape `OMS/cmtt/m/n' undefined
+\usepackage[T1]{fontenc}
+\addtolength{\evensidemargin}{-.5in}
+\addtolength{\oddsidemargin}{-.5in}
+\addtolength{\textwidth}{0.8in}
+\addtolength{\textheight}{0.8in}
+\addtolength{\topmargin}{-.4in}
+
+\AtBeginEnvironment{proof}{\setcounter{equation}{0}}
+
+\newtheorem{prop}{Proposition}
+\newtheoremstyle{quest}{\topsep}{\topsep}{}{}{\bfseries}{}{ }{\thmname{#1}\thmnote{ #3}.}
+\theoremstyle{quest}
+\newtheorem*{question}{Question}
+\newtheorem*{qpart}{}
+\newtheorem*{definition}{Definition}
+\newtheorem*{theorem}{Theorem}
+\newtheorem*{lemma}{Lemma}
+\newtheorem*{exercise}{Exercise}
+\newtheorem*{challengeproblem}{Challenge Problem}
+
+\newcommand{\name}{%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% put your name here, so we know who to give credit to %%
+    Jaechol Lee, Wenjun Wang, and Marshall Blundell
+}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand{\hw}{%%%%%%%%%%%%%%%%%%%%
+%% and which homework assignment is it? %%%%%%%%%
+%% put the correct number below              %%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+1
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\title{\vspace{-50pt}
+\Large \name
+\\\vspace{20pt}
+\huge ARE 212\hfill Homework \hw}
+\author{}
+\date{February 2, 2018}
+\pagestyle{myheadings}
+\markright{\name\hfill Homework \hw\qquad\hfill}
+
+%% If you want to define a new command, you can do it like this:
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\I}{\mathbb{I}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\interior}[1]{%
+  {\kern0pt#1}^{\mathrm{o}}%
+}
+\newcommand\given[1][]{\:#1\vert\:}
+
+% https://tex.stackexchange.com/questions/79434/double-perpendicular-symbol-for-independence
+\newcommand\independent{\protect\mathpalette{\protect\independenT}{\perp}}
+\def\independenT#1#2{\mathrel{\rlap{$#1#2$}\mkern2mu{#1#2}}}
+
+%% If you want to use a function like ''sin'' or ''cos'', you can do it like this
+%% (we probably won't have much use for this)
+% \DeclareMathOperator{\sin}{sin}   %% just an example (it's already defined)
+\DeclareMathOperator{\sgn}{sgn}
+\DeclareMathOperator{\mesh}{mesh}
+
+
+\begin{document}
+\maketitle
+
+First we set up and make some useful functions.
+<<setUpChunk>>=
+library(pacman)
+p_load(haven, dplyr, readr, tidyr, haven)
+
+dir <- "C:/Users/mblundell/Documents/ARE/ARE212/PS1/"
+originaldata <- paste0(dir, "OriginalData/")
+output <- paste0(dir, "Output/")
+
+source(paste0(dir, "Code/ps1functions.R"))
+@
+
+<<functionsChunk>>=
+#
+# demean() takes a vector and returns demeaned vector.
+#
+demean <- function(x) x - mean(x)
+
+#
+# reg() takes a vector y and a matrix X and regresses y on X
+# Return value is matrix of coefficients.
+# Does not include an intercept by default. User must append
+# a vector of ones to X in that case.
+#
+reg <- function(y, X) {
+    solve(t(X) %*% X) %*% t(X) %*% y
+}
+
+#
+# pred() takes a matrix X and a matrix beta
+# Return value is vector of predicted values.
+#
+pred <- function(X, beta) {
+    as.vector(X %*% beta)
+}
+
+#
+# R.squared.uc() takes a vector e of residuals and a vector
+# dependent variable y and returns uncentered R squared.
+#
+R.squared.uc <- function(e, y) {
+    as.vector(1 - (t(e) %*% e) / (t(y) %*% y))
+}
+
+#
+# R.squared() takes a vector e of residuals and a vector
+# dependent variable y and returns centered R squared.
+#
+R.squared <- function(e, y) {
+    y.demeaned <- demean(y)
+    as.vector(1 - ((t(e) %*% e) / (t(y.demeaned) %*% y.demeaned)))
+}
+
+#
+# adj.R.squared() takes a vector e of residuals and a vector
+# dependent variable y, total degrees of freedom and residual degrees
+# of freedom and calculates adjusted R-squared.
+#
+adj.R.squared <- function(e, y, df.t, df.e) {
+    as.vector(1 - (1 - R.squared(e, y)) * (df.t / df.e))
+}
+
+# 
+# AIC() takes a n, the number of obs, k, the number of estimated
+# parameters (including variance), and e, a matrix of residuals, 
+# and returns a scalar AIC.
+# In the case of least squares this is
+# n * log(SSR / n) + 2 * k
+#
+AIC <- function(n, k, e) {
+    as.vector(n * log((t(e) %*% e) / n) + 2 * k)
+}
+
+# 
+# SIC() takes a n, the number of obs, k, the number of fitted
+# parameters, and e, a matrix of residuals, and returns
+# a scalar AIC.
+# In the case of least squares this is
+# n * log(SSR / n) + 2 * log(n)
+#
+SIC <- function(n, k, e) {
+    as.vector(n * log((t(e) %*% e) / n) + 2 * log(n))
+}
+
+# 
+# s.squared() takes a matrix of residuals e and degrees of freedom
+# and estimates standard error.
+#
+s.squared <- function(e, df) {
+    as.vector((t(e) %*% e) / df)
+}
+
+# 
+# report.stats() takes a vector dependent variable y, a matrix
+# of regressors X, # and fitted values beta and compiles summary
+# stats in a list
+#
+report.stats <- function(y, X, beta) {
+    # Set up output
+    out <- list()
+
+    # Get some intermediate values
+    y_hat  <- pred(X, beta)
+    e <- y - y_hat
+
+    # Compile output
+    out$n <- dim(X)[1]
+    out$df <- dim(X)[1] - dim(X)[2]
+    out$beta <- beta
+    out$R2.uc <- R.squared.uc(e, y)
+    out$adj.R2 <- adj.R.squared(e, y, out$n, out$df)
+    out$R2 <- R.squared(e, y)
+    out$AIC <- AIC(out$n, dim(X)[2] + 1, e)
+    out$SIC <- SIC(out$n, dim(X)[2] + 1, e)
+    out$s2 <- s.squared(e, out$df)
+
+    out
+}
+@
+
+\begin{question}[1]
+A very useful source of data is the World Bank's World Development Indicators (in their
+Data Center): 
+\url{http://databank.worldbank.org/data/reports.aspx?source=world-development-indicators}
+Download the variables \ce{CO2} emissions (kt) [EN.ATM.CO2E.KT], Gross Domestic Product
+(constant 2010 US\$) [NY.GDP.MKTP.KD] and population (total) [SP.POP.TOTL] for the year
+2010 for as many countries (not aggregates of countries) as you can. There should be
+194 with complete data.
+\end{question}
+
+\begin{question}[2]
+Read the data into R, using the labels \textbf{CO2}, \textbf{GDP} and \textbf{POP}
+for your three variables.
+\end{question}
+
+<<q1Chunk, warning=F>>=
+# 
+# Load data and clean it up a bit.
+#
+data <- read_csv(paste0(originaldata,
+                        "be0eb9fc-f1b9-4f50-bd91-379b8978c377_Data.csv"),
+                 col_types = "ccccn")
+
+# Remove missing values at the end of dataset.
+data <- data[complete.cases(data),]
+
+# Drop a couple of variables we don't need.
+data[,c("Series Code")] <- NULL
+
+# Data are in long format so we reshape to wide.
+data <- spread(data, c("Series Name"), c("2010 [YR2010]"))
+
+# Remove any obs with missing values.
+data <- data[complete.cases(data),]
+
+# Rename columns.
+names(data) <- c("country", "code", "CO2", "GDP", "POP")
+
+# Confirm we have 194 countries with complete data.
+dim(data)
+@
+
+\begin{question}[3]
+Calculate a table showing the sample mean, standard deviation, minimum and maximum
+for each series.
+\end{question}
+<<q3Chunk>>=
+sapply(data[, c("CO2", "GDP", "POP")],
+       function(x) c(mean = mean(x), sd = sd(x), min = min(x), max = max(x)))
+@
+
+\begin{question}[4]
+Create a histogram for \textbf{CO2} and \textbf{GDP} (15 buckets).
+\end{question}
+<<q4ChunkCO2Hist>>=
+# 4. Create a histogram for CO2 with 15 buckets
+buckets <- 15
+hist(data$CO2, breaks = buckets, 
+     main = "Histogram of CO2 Emissions (kt) for 2010.",
+     xlab  = "CO2 Emissions (kt)")
+@
+
+<<q4ChunkGDPHist>>=
+# Now do the same for GDP
+hist(data$GDP, breaks = buckets, 
+     main = "Histogram of GDP (constant 2010 US $)",
+     xlab  = "GDP (constant 2010 US $)")
+@
+
+\begin{question}[5]
+Plot \textbf{CO2} against \textbf{GDP}.
+\end{question}
+<<q5Chunk>>=
+# 5. Plot CO2 against GDP.
+plot(data$GDP, data$CO2,
+     xlab = "GDP (constant 2010 US $)",
+     ylab = "CO2 Emissions (kt)",
+     main = "Scatterplot of CO2 Emissions against GDP for 2010")
+@
+
+\begin{question}[6]
+Create a new variable ``Per capita CO2 emissions'' called \textbf{CO2pc}.
+\end{question}
+<<q6Chunk>>=
+# 6. Create a new variable "Per capita CO2 emissions," CO2pc.
+data$CO2pc <- data$CO2 / data$POP
+@
+
+\begin{question}[7]
+Create a new variable ``Per capita GDP'' called \textbf{GDPpc}.
+\end{question}
+<<q7Chunk>>=
+# 7. Create a new variable "Per capita GDP," GDPpc.
+data$GDPpc <- data$GDP / data$POP
+@
+
+\begin{question}[8]
+Plot \textbf{CO2pc} against \textbf{GDPpc}.
+\end{question}
+<<q8Chunk>>=
+# 8. Plot CO2pc against GDPpc
+plot(data$GDPpc, data$CO2pc,
+     xlab = "GDP per capita (constant 2010 US $)",
+     ylab = "CO2 Emissions (kt) per capita",
+     main = "Scatterplot of CO2 per capita against GDP per capita for 2010")
+@
+
+\begin{question}[9]
+Create demeaned variables of \textbf{CO2pc} and \textbf{GDPpc}
+called \textbf{CO2pcdev} and \textbf{GDPpcdev} by subtracting the
+sample mean from each observaion.
+\end{question}
+<<q9Chunk>>=
+# 9. Create demeaned variables of CO2pc and GDPpc
+data$CO2pcdev <- demean(data$CO2pc)
+data$GDPpcdev <- demean(data$GDPpc)
+@
+
+\begin{question}[10]
+Plot \textbf{CO2pcdev} against \textbf{GDPpcdev}.
+\end{question}
+<<q10Chunk>>=
+# 10. Plot CO2pc against GDPpc
+plot(data$GDPpcdev, data$CO2pcdev,
+     xlab = "GDP p.c., demeaned (constant 2010 US $)",
+     ylab = "CO2 Emissions p.c., demeaned (kt)",
+     main = "Scatterplot of demeaned CO2 p.c. against demeaned GDP p.c.")
+@
+
+\begin{question}[11]
+Create the variables \textbf{CO2pcln} and \textbf{GDPpcln} by taking
+natural logs of \textbf{CO2pc} and \textbf{GDPpc}.
+\end{question}
+<<q11Chunk>>=
+# 11 Take natural log of CO2pc and GDPpc
+data$CO2pcln <- log(data$CO2pc)
+data$GDPpcln <- log(data$GDPpc)
+@
+
+\begin{question}[12]
+Plot \textbf{CO2pcln} against \textbf{GDPpcln}. 
+\end{question}
+<<q12Chunk>>=
+# 12 Plot CO2pcln
+plot(data$GDPpcln, data$CO2pcln,
+     xlab = "ln(GDP p.c. (constant 2010 US $))",
+     ylab = "ln(CO2 Emissions PC (kt))",
+     main = "Scatterplot of ln(CO2 Emission p.c.) against ln(GDP p.c.)")
+@
+
+\begin{question}[13]
+Export your data as a comma delimited ascii file.
+\end{question}
+<<q13Chunk>>=
+# 13 Export data as a comma delimited ascii file
+write.table(data, file = paste0(output, "data_q13.csv"), row.names = F, sep = ",")
+@
+
+\begin{question}[14]
+Regress \textbf{CO2pc} on \textbf{GDPpc} without an intercept.
+Write down your regression coefficient. Now multiply \textbf{CO2pc} by 1000,
+changing its units to tons instead of kilotons. Run the regression again.
+What has happened to the coefficient on \textbf{GDPpc}? Now divide \textbf{GDPpc}
+by 1000, changing its units to thousands of \$ instead of \$. Run the regression
+again. What has happened to the coefficient on \textbf{GDPpc}? (Optional: Calculate
+the $\mathit{R}^2$ for each regression and see what happens. Any changes? What
+happens to the sum of squares?) Keep both variables in the new units.
+\end{question}
+<<q14ChunkReg1>>=
+# Regress CO2pc on GDPpc without an intercept
+beta <- reg(data[, c("CO2pc"), drop = T], as.matrix(data[, c("GDPpc")]))
+beta
+@
+
+<<q14ChunkReg2>>=
+# Multiply CO2pc by 1,000, changing its units to tons.
+data$CO2pc.tons <- data$CO2pc * 1000
+# Run the regression again
+beta.tons <- reg(data[, c("CO2pc.tons"), drop = T], as.matrix(data[, c("GDPpc")]))
+beta.tons
+@
+The coefficient is now larger by a factor of 1,000.
+
+<<q14ChunkReg3>>=
+# Now divide GDPpc by 1,000, changing the units to thousands of $.
+data$GDPpc.thous <- data$GDPpc / 1000
+# Run the regression again
+y <- data[, c("CO2pc.tons"), drop = T]
+X  <- as.matrix(data[, c("GDPpc.thous")])
+beta.tons.thousands <- reg(y, X)
+beta.tons.thousands
+@
+The coefficient is once again larger by a factor of 1,000.
+
+\begin{question}[15]
+For the last regression from the previous part calculate and
+report $n$, degrees of freedom, $\mathbf{b}$, $R^2_{uc}$, $\bar{R}^2$, 
+AIC, SIC, $s^2$. Then calculate the predicted values and plot them
+against \textbf{CO2pc}. Calculate your residuals and plot them
+against \textbf{GDPpc}. Do not submit the graphs, but briefly talk
+about what these figures tell you about fit and the validity of the
+constant variance assumption. Also -- are there any outliers?
+\end{question}
+<<q15Chunk>>=
+# 15. For the regression in the previous part calculate and report a bunch
+# of summary stats
+report.stats(y, X, beta.tons.thousands)
+
+# Plot predicted values against actual CO2pc
+y_hat <- pred(X, beta.tons.thousands)
+plot(y, y_hat,
+     xlab = "Actual CO2 Emissions p.c. (tons)",
+     ylab = "Predicted CO2 Emissions p.c.",
+     main = "Scatterplot of Predicted vs Actual CO2 Emissions p.c.")
+abline(0, 1)
+
+# Plot residuals against GDPpc
+e <- y - y_hat
+plot(X, e,
+     ylab = "Residuals",
+     xlab = "GDP p.c. (thousands of 2010 US $)",
+     main = "Scatterplot of Residuals versus GDP p.c.")
+@
+
+Most of the points in the predicted vs. actual plot lie
+below the 45-degree line. The linear fit underpredicts for
+points in the middle of the GDP range.
+
+Based on the residuals plot we can see that the variance
+of residuals increases as GDP p.c. increases, so it doesn't
+seem like the homosketasticity assumption is satisfied. Most
+of the residuals are positive, as expected based on the
+underprediction we see in the predicted vs actual plot.
+
+There are some outliers which\dots
+
+\begin{question}[16]
+Regress \textbf{CO2pc} on \textbf{GDPpc} and an intercept. Calculate and
+report $n$, degrees of freedom, $\mathbf{b}$, $R^2_{uc}$, $\bar{R}^2$, 
+AIC, SIC, $s^2$. Then calculate the predicted values and plot them against
+\textbf{CO2pc}. Calculate your residuals and plot them against \textbf{GDPpc}.
+Do not submit the graphs. Use the pictures and the residuals to talk about
+how the fit has improved or not.
+\end{question}
+<<q16Chunk>>=
+# 
+# 16. Repeat 15 but with an intercept
+#
+y <- data[, c("CO2pc.tons"), drop = T]
+X  <- cbind(1, as.matrix(data[, c("GDPpc.thous")]))
+beta.tons.thousands.int <- reg(y, X)
+
+# Summary stats
+report.stats(y, X, beta.tons.thousands.int)
+
+# Plot predicted values against actual CO2pc
+y_hat <- pred(X, beta.tons.thousands.int)
+plot(y, y_hat,
+     xlab = "Actual CO2 Emissions p.c. (tons)",
+     ylab = "Predicted CO2 Emissions p.c. (tons)", 
+     main = "Scatterplot of Predicted vs Actual CO2 Emissions p.c. (w. Intercept)")
+abline(0, 1)
+
+# Plot residuals against GDPpc
+e <- y - y_hat
+plot(X[,2], e,
+     xlab = "GDP p.c. (thousands of 2010 US $)",
+     ylab = "Residuals",
+     main = "Scatterplot of Residuals versus GDP p.c. (w. Intercept)")
+@
+
+The fit\dots
+
+\begin{question}[17]
+Regress \textbf{CO2pc} on an intercept, \textbf{GDPpc} and
+\textbf{GDPpc2} where \textbf{GDPpc2} is the square of \textbf{GDPpc}.
+Calculate and
+report $n$, degrees of freedom, $\mathbf{b}$, $R^2_{uc}$, $\bar{R}^2$, 
+AIC, SIC, $s^2$. Then calculate the predicted values and plot them against
+\textbf{CO2pc}. Calculate your residuals and plot them against \textbf{GDPpc}.
+Do not submit the graphs. Use the pictures and the residuals to talk about
+how the fit has improved or not. Also, briefly address whether including
+\textbf{GDPpc2} in the regression violates any of our assumptions. Does this
+specification make economic sense?
+\end{question}
+<<q17Chunk>>=
+# 
+# 17. Regress CO2pc on an intercept, GDPpc, and GDPpc^2
+#
+data$GDPpc.thous.sq <- data$GDPpc.thous^2
+y <- data[, c("CO2pc.tons"), drop = T]
+X  <- cbind(1, as.matrix(data[, c("GDPpc.thous", "GDPpc.thous.sq")]))
+beta.3 <- reg(y, X)
+
+# calculate summary stats
+report.stats(y, X, beta.3)
+
+# Plot predicted values against actual CO2pc
+y_hat <- pred(X, beta.3)
+plot(y, y_hat,
+     xlab = "Actual CO2 Emissions p.c. (tons)",
+     ylab = "Predicted CO2 Emissions p.c.",
+     main = "Scatterplot of Predicted vs Actual CO2 Emissions p.c. (w. Intercept, sq. term)")
+abline(0, 1)
+
+# Plot residuals against GDPpc
+e <- y - y_hat
+plot(X[,2], e, 
+     xlab = "GDP p.c. (thousands of 2010 US $)",
+     ylab = "Residuals",
+     main = "Scatterplot of Residuals versus GDP p.c. (w. Intercept, sq. term")
+@
+
+Fit is improved\dots Including the square term does not violate any of our assumptions, in
+particular it does not violate the full rank condition because it is 
+not a linear function of \textbf{GDPpc}.
+
+\begin{question}[18]
+The power of FWT. Calculate demeaned versions of \textbf{CO2pc}, \textbf{GDPpc}
+and \textbf{GDPpc2}. Regress the demeaned \textbf{CO2pc} on the demeaned
+\textbf{GDPpc} and \textbf{GDPpc2}. Compare your parameter estimates to the
+previous part.
+\end{question}
+<<q18Chunk>>=
+# 
+# 18. Regress demeaned CO2pc (tons) on demeaned GDPpc (thousands) and GDPpc^2
+#
+data$CO2pc.tons.dev <- demean(data$CO2pc.tons)
+data$GDPpc.thous.dev <- demean(data$GDPpc.thous)
+data$GDPpc.thous.sq.dev <- demean(data$GDPpc.thous.sq)
+y <- data[, c("CO2pc.tons.dev"), drop = T]
+X  <- as.matrix(data[, c("GDPpc.thous.dev", "GDPpc.thous.sq.dev")])
+beta.4 <- reg(y, X)
+beta.4
+@
+
+The coefficients are the same as in the previous part, where we included
+an intercept.
+
+\begin{question}[19]
+More power of FWT. Regress \textbf{CO2pc} on \textbf{GDPpc}. Save your residuals. Now
+regress the columns of [$i$ \textbf{GDPpc2}] on \textbf{GDPpc}. Save your residuals
+(an $n$ x 2 matrix of residuals). Now regress the first vector of $n$ residuals on
+the ($n$ x 2) matrix of residuals. Report your findings.
+\end{question}
+<<q19Chunk>>=
+#
+# 19. Run residuals on residuals regression. 
+#
+
+# Regress CO2pc (tons) on GDPpc (thousands) and save residuals
+y <- data[, c("CO2pc.tons"), drop = T]
+X  <- as.matrix(data[, c("GDPpc.thous")])
+beta.tons.thousands <- reg(y, X)
+y_hat <- pred(X, beta.tons.thousands)
+e <- y - y_hat
+
+# Regress [i GDPpc.thous.sq] on GDPpc.thous
+Y <- cbind(1, as.matrix(data[, c("GDPpc.thous.sq")]))
+X <- as.matrix(data[, c("GDPpc.thous")])
+beta.5 <- reg(Y,X)
+E <- Y - X %*% beta.5
+
+resid.betas <- reg(e, E)
+resid.betas
+@
+
+These are also the same as in Question 17, so we have recovered our
+parameter estimates from demeaned data.
+\end{document}
