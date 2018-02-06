@@ -430,7 +430,7 @@ of the residuals are positive, as expected based on the
 underprediction we see in the predicted vs actual plot.
 
 There are some outliers to note. Lichtenstein lies in the upper
-left-hand corner of the predicted vs atual graph, emitting much
+left-hand corner of the predicted vs actual graph, emitting much
 less CO2 per capita considering its GDP per capita, compared to
 other countries. On the other hand, there are some countries emit
 a quite larger amount of CO2 per capita than their predicted amount.
