@@ -31,7 +31,7 @@ knitr::opts_chunk$set(fig.pos = 'h')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% put your name here, so we know who to give credit to %%
-    Jaechol Lee, Wenjun Wang, and Marshall Blundell
+    Jaecheol Lee, Wenjun Wang, and Marshall Blundell
 }%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newcommand{\hw}{%%%%%%%%%%%%%%%%%%%%
 %% and which homework assignment is it? %%%%%%%%%
@@ -47,7 +47,7 @@ knitr::opts_chunk$set(fig.pos = 'h')
 \\\vspace{20pt}
 \huge ARE 212\hfill Homework \hw}
 \author{}
-\date{February 2, 2018}
+\date{February 7, 2018}
 \pagestyle{myheadings}
 \markright{\name\hfill Homework \hw\qquad\hfill}
 
@@ -77,7 +77,7 @@ knitr::opts_chunk$set(fig.pos = 'h')
 \begin{document}
 \maketitle
 
-First we set up and make some useful functions.
+First we set up and define some functions.
 <<setUpChunk>>=
 library(pacman)
 p_load(haven, dplyr, readr, tidyr, haven)
@@ -132,18 +132,18 @@ R.squared <- function(e, y) {
 
 #
 # adj.R.squared() takes a vector e of residuals and a vector
-# dependent variable y, total degrees of freedom and residual degrees
-# of freedom and calculates adjusted R-squared.
+# dependent variable y, total degrees of freedom and residual
+# degrees of freedom and calculates adjusted R-squared.
 #
 adj.R.squared <- function(e, y, df.t, df.e) {
     as.vector(1 - (1 - R.squared(e, y)) * (df.t / df.e))
 }
 
 # 
-# AIC() takes a n, the number of obs, k, the number of estimated
-# parameters (including variance), and e, a matrix of residuals, 
-# and returns a scalar AIC.
-# In the case of least squares this is
+# AIC() takes a n, the number of obs, k, the number of
+# estimated parameters (which should count estimate of
+# variance), and e, a matrix of residuals, and returns
+# a scalar AIC. In the case of least squares this is
 # n * log(SSR / n) + 2 * k
 #
 AIC <- function(n, k, e) {
@@ -151,28 +151,26 @@ AIC <- function(n, k, e) {
 }
 
 # 
-# SIC() takes a n, the number of obs, k, the number of fitted
-# parameters, and e, a matrix of residuals, and returns
-# a scalar AIC.
-# In the case of least squares this is
-# n * log(SSR / n) + 2 * log(n)
+# SIC() takes a n, the number of obs, and e, a matrix of 
+# residuals, and returns a scalar AIC. In the case of
+# least squares this is n * log(SSR / n) + 2 * log(n)
 #
 SIC <- function(n, k, e) {
     as.vector(n * log((t(e) %*% e) / n) + 2 * log(n))
 }
 
 # 
-# s.squared() takes a matrix of residuals e and degrees of freedom
-# and estimates standard error.
+# s.squared() takes a matrix of residuals e and degrees
+# of freedom and estimates standard error.
 #
 s.squared <- function(e, df) {
     as.vector((t(e) %*% e) / df)
 }
 
 # 
-# report.stats() takes a vector dependent variable y, a matrix
-# of regressors X, # and fitted values beta and compiles summary
-# stats in a list
+# report.stats() takes a vector dependent variable y, a
+# matrix # of regressors X, # and fitted values beta and
+# compiles summary stats in a list
 #
 report.stats <- function(y, X, beta) {
     # Set up output
@@ -189,8 +187,8 @@ report.stats <- function(y, X, beta) {
     out$R2.uc <- R.squared.uc(e, y)
     out$adj.R2 <- adj.R.squared(e, y, out$n, out$df)
     out$R2 <- R.squared(e, y)
-    out$AIC <- AIC(out$n, dim(X)[2] + 1, e)
-    out$SIC <- SIC(out$n, dim(X)[2] + 1, e)
+    out$AIC <- AIC(out$n, dim(X)[2] + 1, e) # Add 1 to dim(X)[2] for variance
+    out$SIC <- SIC(out$n, dim(X)[2] + 1, e) # Add 1 to dim(X)[2] for variance
     out$s2 <- s.squared(e, out$df)
 
     out
@@ -400,7 +398,7 @@ against \textbf{GDPpc}. Do not submit the graphs, but briefly talk
 about what these figures tell you about fit and the validity of the
 constant variance assumption. Also -- are there any outliers?
 \end{question}
-<<q15Chunk>>=
+<<q15Chunk,fig.show="hide">>=
 # 15. For the regression in the previous part calculate and report a bunch
 # of summary stats
 report.stats(y, X, beta.tons.thousands)
@@ -431,7 +429,14 @@ seem like the homosketasticity assumption is satisfied. Most
 of the residuals are positive, as expected based on the
 underprediction we see in the predicted vs actual plot.
 
-There are some outliers which\dots
+There are some outliers to note. Lichtenstein lies in the upper
+left-hand corner of the predicted vs atual graph, emitting much
+less CO2 per capita considering its GDP per capita, compared to
+other countries. On the other hand, there are some countries emit
+a quite larger amount of CO2 per capita than their predicted amount.
+They are ones heavily dependent on natural gas or petroleum oils: Trinidad
+and Tobago, Qatar, Kuwait, Aruba, Bahrain, Saudi Arabia, etc., which
+can be seen in the lower-right part of the same scatter plot.
 
 \begin{question}[16]
 Regress \textbf{CO2pc} on \textbf{GDPpc} and an intercept. Calculate and
@@ -441,13 +446,14 @@ AIC, SIC, $s^2$. Then calculate the predicted values and plot them against
 Do not submit the graphs. Use the pictures and the residuals to talk about
 how the fit has improved or not.
 \end{question}
-<<q16Chunk>>=
+<<q16Chunk,fig.show="hide">>=
 # 
 # 16. Repeat 15 but with an intercept
 #
 y <- data[, c("CO2pc.tons"), drop = T]
 X  <- cbind(1, as.matrix(data[, c("GDPpc.thous")]))
 beta.tons.thousands.int <- reg(y, X)
+rownames(beta.tons.thousands.int)[1] <- "Intercept"
 
 # Summary stats
 report.stats(y, X, beta.tons.thousands.int)
@@ -468,7 +474,14 @@ plot(X[,2], e,
      main = "Scatterplot of Residuals versus GDP p.c. (w. Intercept)")
 @
 
-The fit\dots
+The fit has improved. In the predicted vs actuals plot, the points are more centered
+around the 45-degree line. Likewise the residuals are shifted down to lie on either
+side of zero as opposed to mostly above.
+
+If we examine the summary stats presented above, we can also say that the fit improved.
+The first three R-square values increased and the other statistics (AIC, SIC, and s2)
+decreased, which shows that the regression including an intercept has a better fit
+than the case without an intercept. 
 
 \begin{question}[17]
 Regress \textbf{CO2pc} on an intercept, \textbf{GDPpc} and
@@ -482,7 +495,7 @@ how the fit has improved or not. Also, briefly address whether including
 \textbf{GDPpc2} in the regression violates any of our assumptions. Does this
 specification make economic sense?
 \end{question}
-<<q17Chunk>>=
+<<q17Chunk,fig.show="hide">>=
 # 
 # 17. Regress CO2pc on an intercept, GDPpc, and GDPpc^2
 #
@@ -490,6 +503,7 @@ data$GDPpc.thous.sq <- data$GDPpc.thous^2
 y <- data[, c("CO2pc.tons"), drop = T]
 X  <- cbind(1, as.matrix(data[, c("GDPpc.thous", "GDPpc.thous.sq")]))
 beta.3 <- reg(y, X)
+rownames(beta.3)[1] <- "Intercept"
 
 # calculate summary stats
 report.stats(y, X, beta.3)
@@ -510,9 +524,16 @@ plot(X[,2], e,
      main = "Scatterplot of Residuals versus GDP p.c. (w. Intercept, sq. term")
 @
 
-Fit is improved\dots Including the square term does not violate any of our assumptions, in
+Fit is improved. In the predited vs actual plot, points are well-centered around the
+45-degree line across the range of actual emissions. Note that before we saw a non-linear
+relationship where the cluster near zero mostly lay above the line. Residuals are more
+evenly dispersed around zero. There is still evidence of heterosketasticity.
+
+Including the square term does not violate any of our assumptions, in
 particular it does not violate the full rank condition because it is 
-not a linear function of \textbf{GDPpc}.
+not a linear function of \textbf{GDPpc}. This result does make economic sense in that,
+while countries emit more CO2 as they are industrialized, they try to enhance their
+natural environment reducing the emission after some degree of industrialization.
 
 \begin{question}[18]
 The power of FWT. Calculate demeaned versions of \textbf{CO2pc}, \textbf{GDPpc}

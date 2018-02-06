@@ -2,7 +2,7 @@
 #     File Name           :     Documents/ARE/ARE212/PS1/Code/ps1functions.R
 #     Created By          :     MBlundell
 #     Creation Date       :     [2018-01-28 09:19]
-#     Last Modified       :     [2018-02-01 18:38]
+#     Last Modified       :     [2018-02-06 10:56]
 #     Description         :      
 #     Stores useful functions for ps1.
 #############################################################
@@ -58,8 +58,8 @@ adj.R.squared <- function(e, y, df.t, df.e) {
 
 # 
 # AIC() takes a n, the number of obs, k, the number of estimated
-# parameters (including variance), and e, a matrix of residuals, and returns
-# a scalar AIC.
+# parameters (which should count estimate of variance), and e, a matrix of residuals, 
+# and returns a scalar AIC.
 # In the case of least squares this is
 # n * log(SSR / n) + 2 * k
 #
@@ -68,10 +68,8 @@ AIC <- function(n, k, e) {
 }
 
 # 
-# SIC() takes a n, the number of obs, k, the number of fitted
-# parameters, and e, a matrix of residuals, and returns
-# a scalar AIC.
-# In the case of least squares this is
+# SIC() takes a n, the number of obs, and e, a matrix of residuals, and returns
+# a scalar AIC. In the case of least squares this is
 # n * log(SSR / n) + 2 * log(n)
 #
 SIC <- function(n, k, e) {
@@ -105,8 +103,8 @@ report.stats <- function(y, X, beta) {
     out$R2.uc <- R.squared.uc(e, y)
     out$adj.R2 <- adj.R.squared(e, y, out$n, out$df)
     out$R2 <- R.squared(e, y)
-    out$AIC <- AIC(out$n, dim(X)[2] + 1, e)
-    out$SIC <- SIC(out$n, dim(X)[2] + 1, e)
+    out$AIC <- AIC(out$n, dim(X)[2] + 1, e) # Add 1 to estimated parameters to take into account variance estimate
+    out$SIC <- SIC(out$n, dim(X)[2] + 1, e) # Add 1 to estimated parameters to take into account variance estimate
     out$s2 <- s.squared(e, out$df)
 
     out

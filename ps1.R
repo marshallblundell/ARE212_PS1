@@ -2,7 +2,7 @@
 #     File Name           :     Documents/ARE/ARE212/PS1/Code/ps1.R
 #     Created By          :     MBlundell
 #     Creation Date       :     [2018-01-27 14:36]
-#     Last Modified       :     [2018-02-02 12:30]
+#     Last Modified       :     [2018-02-06 10:49]
 #     Description         :      
 #     
 #############################################################
@@ -156,6 +156,7 @@ plot(X, e,
 y <- data[, c("CO2pc.tons"), drop = T]
 X  <- cbind(1, as.matrix(data[, c("GDPpc.thous")]))
 beta.tons.thousands.int <- reg(y, X)
+rownames(beta.tons.thousands.int)[1] <- "Intercept"
 
 # Summary stats
 report.stats(y, X, beta.tons.thousands.int)
@@ -182,6 +183,7 @@ data$GDPpc.thous.sq <- data$GDPpc.thous^2
 y <- data[, c("CO2pc.tons"), drop = T]
 X  <- cbind(1, as.matrix(data[, c("GDPpc.thous", "GDPpc.thous.sq")]))
 beta.3 <- reg(y, X)
+rownames(beta.3)[1] <- "Intercept"
 
 # calculate summary stats
 report.stats(y, X, beta.3)
